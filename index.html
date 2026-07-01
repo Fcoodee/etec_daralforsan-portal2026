@@ -38,7 +38,21 @@
 <body class="text-gray-800 antialiased min-h-screen flex flex-col">
 
     <!-- TOP HEADER -->
-    <header class="bg-white border-b border-gray-100 shadow-sm py-6 px-4">
+    <!-- FIXED DATE/TIME BAR -->
+<div id="dash-clock-bar" class="bg-slate-900 text-white text-xs font-bold px-4 py-2 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1.5"><i class="fa-regular fa-calendar text-accentgold"></i> <span id="dash-live-date">--</span></span>
+        <span class="w-px h-3 bg-white/20"></span>
+        <span class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-accentgold"></i> <span id="dash-live-time">--</span></span>
+    </div>
+    <div class="flex items-center gap-2">
+        <span id="admin-status-bar" class="hidden items-center gap-1.5 text-emerald-400"><i class="fa-solid fa-shield-check"></i> <span id="admin-name-bar"></span></span>
+        <button onclick="requireAdmin(null, showAdminPanel)" class="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-user-shield text-accentgold"></i> مدير النظام
+        </button>
+    </div>
+</div>
+<header class="bg-white border-b border-gray-100 shadow-sm py-6 px-4">
         <div class="max-w-7xl mx-auto flex flex-col items-center justify-center">
             <!-- Dynamic Logos Uploaders -->
             <div class="flex flex-wrap justify-center items-center gap-8 mb-6 w-full max-w-4xl">
@@ -229,6 +243,116 @@
     </footer>
 
     <script>
+        // ====================================================
+        // نظام الصلاحيات - المشرفون المسموح لهم بالتعديل
+        // ====================================================
+        const ADMIN_USERS = [
+            { email: "f.it@live.com",                    password: "admin123" },
+            { email: "mf6643169@gmail.com",              password: "admin123" },
+            { email: "hassan.yassin@daralforsan.edu.sa", password: "admin123" },
+            { email: "waleed.hyder@daralforsan.edu.sa",  password: "admin123" }
+        ];
+
+        let adminSession = { loggedIn: false, email: "", pendingCallback: null };
+
+        function isAdminLoggedIn() { return adminSession.loggedIn; }
+
+        function requireAdmin(event, callback) {
+            if (event) event.stopPropagation();
+            if (isAdminLoggedIn()) {
+                if (callback) callback();
+            } else {
+                adminSession.pendingCallback = callback || null;
+                document.getElementById('admin-email-input').value = '';
+                document.getElementById('admin-pass-input').value = '';
+                document.getElementById('admin-auth-error').classList.add('hidden');
+                document.getElementById('admin-auth-modal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('admin-email-input').focus(), 100);
+            }
+        }
+
+        function verifyAdmin() {
+            const email = document.getElementById('admin-email-input').value.trim().toLowerCase();
+            const pass  = document.getElementById('admin-pass-input').value;
+            const match = ADMIN_USERS.find(u => u.email.toLowerCase() === email && u.password === pass);
+            if (!match) {
+                document.getElementById('admin-auth-error').classList.remove('hidden');
+                document.getElementById('admin-pass-input').value = '';
+                document.getElementById('admin-pass-input').focus();
+                return;
+            }
+            adminSession.loggedIn = true;
+            adminSession.email = match.email;
+            closeAdminModal();
+            updateAdminBar();
+            showToast('تم التحقق من الصلاحية بنجاح ✓ مرحباً ' + match.email);
+            if (adminSession.pendingCallback) {
+                const cb = adminSession.pendingCallback;
+                adminSession.pendingCallback = null;
+                cb();
+            }
+        }
+
+        function closeAdminModal() {
+            document.getElementById('admin-auth-modal').classList.add('hidden');
+        }
+
+        function showAdminPanel() {
+            showToast('أنت بالفعل مسجل كمدير. يمكنك الآن تعديل المؤشرات.');
+        }
+
+        function logoutAdmin() {
+            adminSession = { loggedIn: false, email: "", pendingCallback: null };
+            updateAdminBar();
+            buildDashboardSystem();
+            renderWelcomeOverview();
+            showToast('تم تسجيل الخروج من صلاحيات المدير');
+        }
+
+        function updateAdminBar() {
+            const bar = document.getElementById('admin-status-bar');
+            const nameEl = document.getElementById('admin-name-bar');
+            if (isAdminLoggedIn()) {
+                bar.classList.remove('hidden');
+                bar.classList.add('flex');
+                nameEl.innerText = adminSession.email;
+            } else {
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+            }
+        }
+
+        // ====================================================
+        // الساعة والتاريخ الحي في Dashboard
+        // ====================================================
+        function updateDashClock() {
+            const now = new Date();
+            const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+            const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+            const dateStr = `${days[now.getDay()]}، ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}م`;
+            let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+            const ampm = h >= 12 ? 'م' : 'ص';
+            h = h % 12 || 12;
+            const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm}`;
+            const de = document.getElementById('dash-live-date');
+            const te = document.getElementById('dash-live-time');
+            if (de) de.innerText = dateStr;
+            if (te) te.innerText = timeStr;
+        }
+
+        // ====================================================
+        // تعديل حالة المؤشر (للمشرف فقط)
+        // ====================================================
+        function changeIndicatorStatus(domainId, stdIdx, focusIdx, indIdx, newStatus) {
+            comprehensiveDashboardData
+                .find(d => d.id === domainId)
+                .standards[stdIdx]
+                .focusAreas[focusIdx]
+                .indicators[indIdx].status = newStatus;
+            buildDashboardSystem();
+            renderWelcomeOverview();
+        }
+
         const googleDriveLink = "https://drive.google.com/drive/folders/19eBfs6wK7rZvje81ANWFTl_ORLAqK3v6?usp=drive_link";
 
         // قاعدة البيانات الشاملة مع الألوان الأصلية المحددة بدقة
@@ -436,6 +560,10 @@
         }
 
         function sendAssignmentEmail(managerName, managerEmail, domainTitle, teamName) {
+            if (!isAdminLoggedIn()) {
+                requireAdmin(null, () => sendAssignmentEmail(managerName, managerEmail, domainTitle, teamName));
+                return;
+            }
             const subject = `[تكليف رسمي ومتابعة]: حوكمة معايير ومؤشرات - ${domainTitle}`;
             const body = `المكرم الزميل العزيز / ${managerName} المحترم،\n` +
                          `رئيس لجنة ومسؤول: ${domainTitle}\n` +
@@ -450,6 +578,10 @@
 
         // تحديث نظام إرسال تقدم العمل الذكي ليدمج نسب الإنجاز التراكمية أمام كل مجال وتأكيدها رقمياً
         function sendProgressEmail(domainId) {
+            if (!isAdminLoggedIn()) {
+                requireAdmin(null, () => sendProgressEmail(domainId));
+                return;
+            }
             const domain = comprehensiveDashboardData.find(d => d.id === domainId);
             if (!domain) return;
 
@@ -500,18 +632,38 @@
             document.execCommand("copy");
             document.body.removeChild(tempTextArea);
 
-            const toast = document.getElementById("toast-message");
-            toast.classList.remove("opacity-0", "translate-y-20");
-            toast.classList.add("opacity-100", "translate-y-0");
+            showToast('تم نسخ التقرير ونسب تقدم العمل بنجاح! جاري فتح البريد...');
 
             setTimeout(() => {
-                toast.classList.remove("opacity-100", "translate-y-0");
-                toast.classList.add("opacity-0", "translate-y-20");
-                
                 const subject = `[تقرير نسب تقدم العمل الحالي - ${domainPercentage}%]: ${domain.title}`;
                 const emailIntro = `تحية طيبة، تم تلقائياً نسخ التقرير التحليلي الشامل للمجال متضمناً نسب تقدم المعايير والتراكيز بالأرقام للحافظة. يرجى فقط عمل (لصق أو Ctrl+V) هنا لإرسال التحديث لفريق العمل وفحصه فوراً.`;
                 window.location.href = `mailto:${domain.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailIntro)}`;
             }, 2500);
+        }
+
+        // ====================================================
+        // دالة Toast مشتركة
+        // ====================================================
+        function showToast(msg) {
+            const toast = document.getElementById("toast-message");
+            document.getElementById("toast-text").innerText = msg;
+            toast.classList.remove("opacity-0", "translate-y-20");
+            toast.classList.add("opacity-100", "translate-y-0");
+            setTimeout(() => {
+                toast.classList.remove("opacity-100", "translate-y-0");
+                toast.classList.add("opacity-0", "translate-y-20");
+            }, 3000);
+        }
+
+        function toggleDomainEdit(domainId) {
+            // تفعيل وضع التعديل: يعيد رسم اللوحة بظهور قوائم الحالة
+            buildDashboardSystem();
+            renderWelcomeOverview();
+            showToast('وضع التعديل فعّال — استخدم القوائم المنسدلة لتغيير حالة المؤشرات ✏️');
+        }
+
+        function toggleStdEdit(stdKey) {
+            showToast('يمكنك الآن تعديل حالات مؤشرات هذا المعيار عبر القوائم المنسدلة ✏️');
         }
 
         // بناء لوحة التحكم ديناميكياً مع دمج حساب الألوان والنسب في جميع المستويات الهيكلية
@@ -543,9 +695,13 @@
                         <div class="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-etecteal-900 text-white">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                 <div class="space-y-1 w-full md:w-auto">
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-3 flex-wrap">
                                         <h2 class="text-lg font-extrabold">${domain.title}</h2>
                                         <span class="px-2 py-0.5 bg-accentgold text-slate-950 font-black text-xs rounded-full shadow-sm">نسبة إنجاز المجال: ${domainProgressValue}%</span>
+                                        <button onclick="requireAdmin(event, () => toggleDomainEdit('${domain.id}'))" title="تعديل مؤشرات المجال (للمشرف فقط)"
+                                            class="px-2 py-1 bg-white/10 hover:bg-amber-400/80 hover:text-slate-900 text-white rounded text-[10px] font-bold transition-all flex items-center gap-1">
+                                            <i class="fa-solid fa-pen-to-square text-amber-300"></i> تعديل
+                                        </button>
                                     </div>
                                     <div class="text-xs text-slate-300 space-y-1 mt-2">
                                         <div><i class="fa-solid fa-user-tie text-accentgold ml-1"></i> <strong>المسؤول الأول:</strong> ${domain.manager}</div>
@@ -570,9 +726,12 @@
 
                     domainBlock += `
                         <div class="bg-slate-50 p-3 rounded-lg border border-slate-200/60">
-                            <div class="flex justify-between items-center mb-3 border-b pb-1.5">
+                            <div class="flex justify-between items-center mb-3 border-b pb-1.5 gap-2 flex-wrap">
                                 <h3 class="font-extrabold text-xs text-etecteal-900">${standard.title}</h3>
-                                <span class="text-[10px] font-bold px-2 py-0.5 bg-etecteal-50 text-etecteal-700 rounded-md border border-etecteal-200">تقدم المعيار: ${standardProgressValue}%</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold px-2 py-0.5 bg-etecteal-50 text-etecteal-700 rounded-md border border-etecteal-200">تقدم المعيار: ${standardProgressValue}%</span>
+                                    ${isAdminLoggedIn() ? `<button onclick="requireAdmin(event, () => toggleStdEdit('${domain.id}-std-${domain.standards.indexOf(standard)}'))" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-[9px] font-bold transition-all"><i class="fa-solid fa-pen text-[9px]"></i> تعديل</button>` : ''}
+                                </div>
                             </div>
                     `;
 
@@ -582,9 +741,12 @@
 
                         domainBlock += `
                             <div class="bg-white p-3 rounded border mb-3 shadow-sm">
-                                <div class="flex justify-between items-center mb-2 bg-slate-50 p-1.5 rounded">
+                                <div class="flex justify-between items-center mb-2 bg-slate-50 p-1.5 rounded gap-2 flex-wrap">
                                     <h4 class="text-[11px] font-black text-slate-700 border-r-2 border-accentgold pr-2">${focus.name}</h4>
-                                    <span class="text-[10px] font-black text-accentgold">تقدم التركيز: ${focusProgressValue}%</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-black text-accentgold">تقدم التركيز: ${focusProgressValue}%</span>
+                                        ${isAdminLoggedIn() ? `<button onclick="requireAdmin(event, () => {})" class="px-1.5 py-0.5 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-600 rounded text-[9px] font-bold"><i class="fa-solid fa-pen text-[9px]"></i></button>` : ''}
+                                    </div>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         `;
@@ -595,7 +757,19 @@
                                 <div class="border-r-2 ${colors.border} bg-slate-50/60 p-3 rounded-l text-[11px] space-y-1 hover:shadow-sm transition-all">
                                     <div class="flex justify-between items-center font-bold mb-1">
                                         <span class="bg-slate-200 px-1 rounded text-[10px]">${indicator.code}</span>
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-black tracking-wide ${colors.bg}">${colors.label}</span>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-2 py-0.5 rounded text-[9px] font-black tracking-wide ${colors.bg}">${colors.label}</span>
+                                            ${isAdminLoggedIn() ? `
+                                            <select onchange="changeIndicatorStatus('${domain.id}',${domain.standards.indexOf(standard)},${standard.focusAreas.indexOf(focus)},${focus.indicators.indexOf(indicator)},this.value)"
+                                                class="text-[9px] border border-amber-300 bg-amber-50 text-amber-800 rounded px-1 py-0.5 font-bold cursor-pointer" title="تغيير الحالة">
+                                                <option value="green" ${indicator.status==='green'?'selected':''}>✅ مكتمل</option>
+                                                <option value="blue" ${indicator.status==='blue'?'selected':''}>🔵 جاهز هندسياً</option>
+                                                <option value="cyan" ${indicator.status==='cyan'?'selected':''}>🔷 مراجعة نهائية</option>
+                                                <option value="yellow" ${indicator.status==='yellow'?'selected':''}>🟡 مسودة</option>
+                                                <option value="gray" ${indicator.status==='gray'?'selected':''}>⚪ نقص أدلة</option>
+                                                <option value="red" ${indicator.status==='red'?'selected':''}>🔴 فجوة حرجة</option>
+                                            </select>` : ''}
+                                        </div>
                                     </div>
                                     <p class="font-bold text-slate-800 leading-relaxed">${indicator.text}</p>
                                     <div class="text-[10px] text-gray-600 space-y-1 pt-2 border-t border-dashed mt-2">
@@ -666,7 +840,53 @@
             });
         }
 
-        window.onload = function() { buildDashboardSystem(); renderWelcomeOverview(); };
+        window.onload = function() {
+            buildDashboardSystem();
+            renderWelcomeOverview();
+            updateDashClock();
+            setInterval(updateDashClock, 1000);
+        };
     </script>
+
+    <!-- ====== ADMIN AUTH MODAL ====== -->
+    <div id="admin-auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-7">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-etecteal-600 to-slate-900 flex items-center justify-center">
+                    <i class="fa-solid fa-user-shield text-accentgold text-base"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-sm">صلاحية مدير النظام</h3>
+                    <p class="text-[11px] text-gray-400">يجب عليك أن تسجل الدخول للحصول على صلاحية مدير النظام</p>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <div class="relative">
+                    <i class="fa-solid fa-envelope absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 text-xs"></i>
+                    <input type="email" id="admin-email-input" placeholder="البريد الإلكتروني"
+                        class="w-full pr-8 pl-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-etecteal-500">
+                </div>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 text-xs"></i>
+                    <input type="password" id="admin-pass-input" placeholder="كلمة المرور"
+                        class="w-full pr-8 pl-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-etecteal-500"
+                        onkeydown="if(event.key==='Enter') verifyAdmin()">
+                </div>
+                <div id="admin-auth-error" class="hidden text-[11px] text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>يجب عليك أن تسجل الدخول للحصول على صلاحية مدير النظام</span>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button onclick="verifyAdmin()" class="flex-1 bg-gradient-to-l from-etecteal-600 to-slate-900 text-white font-bold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> تحقق من الصلاحية
+                    </button>
+                    <button onclick="closeAdminModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm transition-all">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
