@@ -122,8 +122,14 @@
         // ===== الساعة والتاريخ الحي الثابت أعلى الصفحة =====
         function updateLiveClock() {
             const now = new Date();
-            const dateStr = now.toLocaleDateString('ar-SA-u-ca-gregory', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            const timeStr = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+            const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+            const dayName = days[now.getDay()];
+            const dateStr = `${dayName}، ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}م`;
+            let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+            const ampm = h >= 12 ? 'م' : 'ص';
+            h = h % 12 || 12;
+            const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm}`;
             const dateEl = document.getElementById('live-date');
             const timeEl = document.getElementById('live-time');
             if (dateEl) dateEl.innerText = dateStr;
